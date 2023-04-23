@@ -65,67 +65,78 @@ ghg.by.gas.sector <- read_excel("../inputs/data-sdg13.xlsx", sheet="CO2 and CH4 
 write.csv(ghg.by.sector, file="../outputs/gas_sectors.csv", row.names = FALSE)
 
 # CAIT emissions data from climatewatch
-pop <- WDI(
-  country = 'all',
-  indicator=c('SP.POP.TOTL'),
-  start=2019,
-  end=2019,
-  extra=TRUE
-) %>%
-  filter(region!="Aggregates") %>%
-  rename(date=year) %>%
-  select(iso3c, pop = SP.POP.TOTL)
-
-cait.raw <- read.csv("../inputs/ghg-emissions-total.csv")
-cait <- select(cait.raw, country = Country.Region, emissions = X2019) %>%
-  mutate(iso3c = countrycode(country, origin = "country.name", destination = "iso3c")) %>%
-  filter(!is.na(iso3c), emissions != "false") %>%
-  select(iso3c, emissions) %>%
-  left_join(pop, by = "iso3c") %>%
-  mutate(emispercap = emissions*1000000/pop) %>%
-  arrange(-emispercap) %>%
-  mutate(cumpop = cumsum(pop)) %>%
-  filter(!is.na(pop))
-
-emis.world <- sum(cait$emissions)
-pop.world <- sum(cait$pop)
-emispercap.world <- emis.world*1000000/pop.world
-world.emissions <- data.frame("WLD", emis.world, pop.world, emispercap.world, 0)
-names(world.emissions) <- c("iso3c", "emissions", "pop", "emispercap", "cumpop")
-
-countries.income <- select(countries, iso3c, income_level_iso3c)
-emis.income <- left_join(cait, countries.income, by="iso3c") %>%
-  group_by(income_level_iso3c) %>%
-  summarise(emissions = sum(emissions), pop = sum(pop)) %>%
-  filter(income_level_iso3c != "INX") %>%
-  mutate(emispercap = emissions*1000000/pop) %>%
-  arrange(-emispercap) %>%
-  mutate(cumpop = cumsum(pop)) %>%
-  rename(iso3c = income_level_iso3c)
-
-cait <- rbind(cait, world.emissions, emis.income)
-
-# emispop.income <- read_excel("../inputs/data-sdg13.xlsx", sheet="GHG CO2 CH4 by income group")
-# colnames(emispop.income) <- c("iso3c", "pop", "ghg", "co2", "ch4")
-# emispop.world <- filter(emispop.income, iso3c == "WLD")
-# emispop.income <- filter(emispop.income, iso3c != "WLD") %>%
-#   arrange(-ghg) %>%
-#   mutate(cumpop_ghg = cumsum(pop)) %>%
-#   arrange(-co2) %>%
-#   mutate(cumpop_co2 = cumsum(pop))%>%
-#   arrange(-ch4) %>%
-#   mutate(cumpop_ch4 = cumsum(pop))
+# pop <- WDI(
+#   country = 'all',
+#   indicator=c('SP.POP.TOTL'),
+#   start=2019,
+#   end=2019,
+#   extra=TRUE
+# ) %>%
+#   filter(region!="Aggregates") %>%
+#   rename(date=year) %>%
+#   select(iso3c, pop = SP.POP.TOTL)
 # 
-# emispop.countries <- read_excel("../inputs/data-sdg13.xlsx", sheet="GHG CO2 CH4 by country")
-# colnames(emispop.countries) <- c("iso3c", "pop", "ghg", "co2", "ch4")
-# emispop.countries <- arrange(emispop.countries, -ghg) %>%
-#   mutate(cumpop_ghg = cumsum(pop)) %>%
-#   arrange(-co2) %>%
-#   mutate(cumpop_co2 = cumsum(pop))%>%
-#   arrange(-ch4) %>%
-#   mutate(cumpop_ch4 = cumsum(pop))
+# cait.raw <- read.csv("ghg-emissions-total.csv")
+# cait <- select(cait.raw, country = Country.Region, emissions = X2019) %>%
+#   mutate(iso3c = countrycode(country, origin = "country.name", destination = "iso3c")) %>%
+#   filter(!is.na(iso3c), emissions != "false") %>%
+#   select(iso3c, emissions) %>%
+#   left_join(pop, by = "iso3c") %>%
+#   mutate(emispercap = emissions*1000000/pop) %>%
+#   arrange(-emispercap) %>%
+#   mutate(cumpop = cumsum(pop)) %>%
+#   filter(!is.na(pop))
+# 
+# emis.world <- sum(cait$emissions)
+# pop.world <- sum(cait$pop)
+# emispercap.world <- emis.world*1000000/pop.world
+# world.emissions <- data.frame("WLD", emis.world, pop.world, emispercap.world, 0)
+# names(world.emissions) <- c("iso3c", "emissions", "pop", "emispercap", "cumpop")
+# 
+# countries.income <- select(countries, iso3c, income_level_iso3c)
+# emis.income <- left_join(cait, countries.income, by="iso3c") %>%
+#   group_by(income_level_iso3c) %>%
+#   summarise(emissions = sum(emissions), pop = sum(pop)) %>%
+#   filter(income_level_iso3c != "INX") %>%
+#   mutate(emispercap = emissions*1000000/pop) %>%
+#   arrange(-emispercap) %>%
+#   mutate(cumpop = cumsum(pop)) %>%
+#   rename(iso3c = income_level_iso3c)
+# 
+# cait <- rbind(cait, world.emissions, emis.income)
 
-write.csv(cait, file="../outputs/countryemissions_cait.csv", row.names = FALSE)
+emispop.income.raw <- read_excel("../inputs/data-sdg13.xlsx", sheet="GHG CO2 CH4 by income group")
+emispop.income <- select(emispop.income.raw, 1, 5:11) %>%
+  filter(iso3c != "others")
+colnames(emispop.income) <- c("iso3c", "pop", "ghg", "co2", "ch4", "ghgpercap", "co2percap", "ch4percap")
+
+#emispop.world <- filter(emispop.income, iso3c == "WLD")
+emispop.income <- arrange(emispop.income, -ghgpercap) %>%
+  mutate(cumpop_ghg = cumsum(pop)) %>%
+  arrange(-co2percap) %>%
+  mutate(cumpop_co2 = cumsum(pop))%>%
+  arrange(-ch4percap) %>%
+  mutate(cumpop_ch4 = cumsum(pop))
+
+emispop.countries.raw <- read_excel("../inputs/data-sdg13.xlsx", sheet="GHG CO2 CH4 by country")
+emispop.countries <- mutate(emispop.countries.raw, iso3c = countrycode(Country, origin = "country.name", destination = "iso3c")) %>%
+  filter(Country != "others") %>%
+  mutate(iso3c = if_else(Country == "Türkiye", "TUR", iso3c)) %>%
+  select(5:12)
+
+colnames(emispop.countries) <- c("pop", "ghg", "co2", "ch4", "ghgpercap", "co2percap", "ch4percap", "iso3c")
+emispop.countries <-relocate(emispop.countries, iso3c) %>%
+  filter(!is.na(ghg)) %>%
+  arrange(-ghgpercap) %>%
+  mutate(cumpop_ghg = cumsum(pop)) %>%
+  arrange(-co2percap) %>%
+  mutate(cumpop_co2 = cumsum(pop))%>%
+  arrange(-ch4percap) %>%
+  mutate(cumpop_ch4 = cumsum(pop))
+
+emispop.all <- rbind(emispop.countries, emispop.income)
+
+write.csv(emispop.all, file="../outputs/emissions_population.csv", row.names = FALSE)
 
 # LULUCF
 lulu.raw <- read_excel("../inputs/data-sdg13.xlsx", sheet = "co2 production v lulucf")
